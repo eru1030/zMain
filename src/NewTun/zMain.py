@@ -2,6 +2,7 @@ import time
 import os
 import uuid
 import pymysql
+from PIL import Image, ImageDraw, ImageFont
 
 from src.NewTun.ApplicationWithDraw import ApplicationWithDraw
 from src.NewTun.Connection import Connection
@@ -19,10 +20,35 @@ class zMain:
     candidate=[]
     currentPath=''
     connection = None
+
+    #初始化函数
     def __init__(self):
         self.currentPath=os.getcwd()
         self.connection = Connection()
-
+        if self.connection.savePath!='':
+            self.currentPath=self.connection.savePath
+            if not os.path.exists(self.currentPath+"\\temp\\"):
+                os.makedirs(self.currentPath)
+        #设置一个默认的图片
+        if not os.path.exists(self.currentPath+"\\temp\\zMain.png"):
+            imgHeight=200
+            imgWidth=500
+            letterHeight=10
+            letterWidth=50
+            imgSize = (imgWidth, imgHeight)
+            bg_color = (255, 255, 255)
+            img = Image.new("RGB", imgSize, bg_color)
+            drawBrush = ImageDraw.Draw(img)
+            textY0 = (imgHeight - letterHeight + 1) / 2
+            textY0 = int(textY0)
+            textX0 = int((imgWidth - letterWidth + 1) / 2)
+            print('text location:', (textX0, textY0))
+            print('text size (width,height):', letterWidth, letterHeight)
+            print('img size(width,height):', imgSize)
+            font = ImageFont.truetype("C:\\Windows\\Fonts\\Arial.ttf", size=20)
+            fg_color = (0, 0, 0)
+            drawBrush.text((textX0, textY0), "---zMain---", fill=fg_color, font=font)
+            img.save(self.currentPath+"\\temp\\zMain.png",quality=100)
 
     #通过股票数据
     def synHistoryStock(self):
@@ -62,9 +88,16 @@ class zMain:
         for item in basicStock:
             count = count + 1
             test = Application()
-            print(str(count) + "     " + item[0]+"     "+item[1]+"    "+item[2]+"    "+item[3])
+            if item[0]!=None and item[1]!=None and item[2]!=None and item[3]!=None:
+                print(str(count) + "     " + item[0]+"     "+item[1]+"    "+item[2]+"    "+item[3])
+            else:
+                continue
             kk = test.execute(item[0])
-            if test.avgCostGrad < 0:
+            if kk.isZsm==1:
+                print("--------主力、散户、反转信号出现------")
+                print(item[0]+"---"+item[1])
+
+            if test.avgCostGrad < 0 or kk.isZsm==1:
                 candidateTemp = []
                 candidateTemp.append(item[0])
                 candidateTemp.append(item[1])
@@ -77,8 +110,8 @@ class zMain:
                 cursor.execute(sql % data)
                 if len(list(cursor)) == 0:
                     print(item)
-                    sql = "INSERT INTO candidate_stock (id, code, name,collect_date,industry,grad,cv,is_down_line) VALUES ( '%s', '%s','%s', '%s','%s', %.8f, %.8f,%i)"
-                    data = (uuid.uuid1(), item[0], item[1],today,item[3],test.avgCostGrad,test.cvValue,test.isDownLine)
+                    sql = "INSERT INTO candidate_stock (id, code, name,collect_date,industry,grad,cv,is_down_line,zsm) VALUES ( '%s', '%s','%s', '%s','%s', %.8f, %.8f,%i,%i)"
+                    data = (uuid.uuid1(), item[0], item[1],today,item[3],test.avgCostGrad,abs(test.cvValue),test.isDownLine,kk.isZsm)
                     cursor.execute(sql % data)
                 connect.commit()
             # 垃圾回收
@@ -94,26 +127,31 @@ class zMain:
 
     #展示筛选的股票
     def stockShow(self):
-        for item in self.candidate:
-            test = ApplicationWithDraw()
-            test.execute(item[0],True,self.currentPath)
-            print(str(item[1])+"   "+item[0]+"   "+str(item[3]))
+        test = ApplicationWithDraw()
+        if self.connection.testCode!='':
+            print("test one stock:"+self.connection.testCode)
+            test.executeForTest(self.connection.testCode,self.currentPath)
+        else:
+            for item in self.candidate:
+                test = ApplicationWithDraw()
+                test.execute(item[0],True,self.currentPath)
+                print(str(item[1])+"   "+item[0]+"   "+str(item[3]))
 
 
 
 zm=zMain()
 sendEmail=SendEmail()
 s=Statistics()
-# #同步历史数据
-zm.synHistoryStock()
-# #扫描选股
+# # #同步历史数据
+# zm.synHistoryStock()
+# # #扫描选股
 zm.scanStock()
-# #股票排名
-zm.sortByStockGrad()
-# #作图
+# # #股票排名
+# zm.sortByStockGrad()
+# # #作图
 zm.stockShow()
-#统计股票盈利情况
-s.fetchStocks()
+# #统计股票盈利情况
+s.statistic()
 # 分类股票推荐发送
 sendEmail.sendYouCanBuy(zm.currentPath)
 
