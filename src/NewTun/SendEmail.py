@@ -7,6 +7,7 @@ from email.mime.text import MIMEText
 from email.header import Header
 
 from src.NewTun.Connection import Connection
+from src.NewTun.JingJu import JingJu
 from src.NewTun.QueryStock import QueryStock
 
 
@@ -14,6 +15,8 @@ class SendEmail:
     tendown=[]
     other=[]
     Zsm=[]
+    GSM=[]
+    jingju=JingJu()
 
 
     def sendYouCanBuy(self,currentPath):
@@ -28,6 +31,7 @@ class SendEmail:
             temp.append(item[0])
             temp.append(item[1])
             temp.append(item[4])
+            temp.append(item[5])
             temp.append(price)
             if price<=10:
                 self.tendown.append(temp)
@@ -36,19 +40,27 @@ class SendEmail:
             #主力、散户、反转信号
             if item[5]==1:
                 self.Zsm.append(temp)
+            if item[5]==2:
+                self.GSM.append(temp)
 
         self.tendown=sorted(self.tendown, key=lambda s: s[2],reverse=False)
         self.other=sorted(self.other, key=lambda s: s[2],reverse=False)
-        self.doSendStockInfoBeautiful(self.Zsm,currentPath,"回踩反弹001")
+        self.Zsm=sorted(self.Zsm, key=lambda s: s[2],reverse=True)
+        self.GSM=sorted(self.GSM, key=lambda s: s[2],reverse=True)
+        self.doSendStockInfoBeautiful(self.Zsm,currentPath,"回踩反弹")
+        self.doSendStockInfoBeautiful(self.GSM,currentPath,"底部吸筹")
         self.doSendStatisticForZsm()
-        self.doSendStockInfoBeautiful(self.tendown,currentPath,"平民股票")
-        self.doSendStockInfoBeautiful(self.other,currentPath,"土豪股票")
+        self.doSendStockInfoBeautiful(self.tendown,currentPath,"   10+元以内")
+        self.doSendStockInfoBeautiful(self.other,currentPath,"  10-元以上")
         self.doSendStatisticPaper()
 
+    def getJingjuNext(self):
+        return self.jingju.readOneJinju()
 
     def doSendStockInfoBeautiful(self,codes,currentPath,subject):
         con=Connection()
-        imgsOKstr = "股票总计："+str(len(codes))
+        myContent="<h4><font color = 'red' > " + self.getJingjuNext() + " </font ></h4></br>"
+        imgsOKstr = myContent+"<p>股票总计："+str(len(codes))
         count=80
         #前二十的股票提供图片显示
         for item in codes:
@@ -96,10 +108,12 @@ class SendEmail:
                 msgRoot.attach(msgImage)
             count=count-1
         try:
-            smtpObj = smtplib.SMTP()
-            smtpObj.connect('smtp.qq.com', 25)  # 25 为 SMTP 端口号
-            smtpObj.login(my_user, my_pass)
-            smtpObj.sendmail(sender, receivers, msgRoot.as_string())
+            users=receivers.split(',')
+            for item in users:
+                smtpObj = smtplib.SMTP()
+                smtpObj.connect('smtp.qq.com', 25)  # 25 为 SMTP 端口号
+                smtpObj.login(my_user, my_pass)
+                smtpObj.sendmail(sender, item, msgRoot.as_string())
             print("邮件发送成功")
         except smtplib.SMTPException:
             print("Error: 无法发送邮件")
@@ -109,7 +123,8 @@ class SendEmail:
 
     def sendStockInfo(self,codes,currentPath):
         con=Connection()
-        imgsOKstr = "当下可选股票："
+        myContent="<h4><font color = 'red' > " + self.getJingjuNext() + " </font ></h4></br>"
+        imgsOKstr = myContent+"当下可选股票："
         count=60
         #前二十的股票提供图片显示
         for item in codes:
@@ -148,10 +163,12 @@ class SendEmail:
                 msgRoot.attach(msgImage)
             count=count-1
         try:
-            smtpObj = smtplib.SMTP()
-            smtpObj.connect('smtp.qq.com', 25)  # 25 为 SMTP 端口号
-            smtpObj.login(my_user, my_pass)
-            smtpObj.sendmail(sender, receivers, msgRoot.as_string())
+            users=receivers.split(',')
+            for item in users:
+                smtpObj = smtplib.SMTP()
+                smtpObj.connect('smtp.qq.com', 25)  # 25 为 SMTP 端口号
+                smtpObj.login(my_user, my_pass)
+                smtpObj.sendmail(sender, item, msgRoot.as_string())
             print("邮件发送成功")
         except smtplib.SMTPException:
             print("Error: 无法发送邮件")
@@ -168,12 +185,15 @@ class SendEmail:
     def doSendStatisticForZsm(self):
         query = QueryStock()
         result = query.queryStockYouBrought("zsm=1")
-        self.sendStatistic(result," 回踩反弹统计")
+        self.sendStatistic(result," 回踩反弹-统计")
+        result = query.queryStockYouBrought("zsm=2")
+        self.sendStatistic(result," 底部吸筹-统计")
 
     # 发送邮件
     def sendStatistic(self,result,title):
         successCount=0
-        htmls="<table border='1'>"
+        myContent="<h4><font color = 'red' > " + self.getJingjuNext() + " </font ></h4></br>"
+        htmls = myContent+"<table border='1'>"
         htmls=htmls+"<tr><td>代码</td><td>名称</td><td>买入时间</td><td>grad</td><td>cv</td><td>买入价格</td><td>当前价格</td><td>增长幅度100%</td></tr>"
         for item in result:
             htmls=htmls+"<tr>"
@@ -206,10 +226,12 @@ class SendEmail:
         mail_msg = endHtml
         msgAlternative.attach(MIMEText(mail_msg, 'html', 'utf-8'))
         try:
-            smtpObj = smtplib.SMTP()
-            smtpObj.connect('smtp.qq.com', 25)  # 25 为 SMTP 端口号
-            smtpObj.login(my_user, my_pass)
-            smtpObj.sendmail(sender, receivers, msgRoot.as_string())
+            users=receivers.split(',')
+            for item in users:
+                smtpObj = smtplib.SMTP()
+                smtpObj.connect('smtp.qq.com', 25)  # 25 为 SMTP 端口号
+                smtpObj.login(my_user, my_pass)
+                smtpObj.sendmail(sender, item, msgRoot.as_string())
             print("邮件发送成功")
         except smtplib.SMTPException:
             print("Error: 无法发送邮件")
