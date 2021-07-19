@@ -72,8 +72,8 @@ class StockInfoSyn:
         startTime=''
         endTime=time.strftime('%Y-%m-%d',time.localtime(time.time()))
         isToady=False
-        bili=1
         for row in cursor.fetchall():
+            bili = 1
             isToady=False
             print(row[0])
             realCode=self.tuShareCode2BaoStockCode(row[0])
@@ -92,8 +92,17 @@ class StockInfoSyn:
                     startTime1=row[0]
                     if int(row[11])==0:
                         print(realCode+"\t 暂停交易了，您可能需要baostock跑个全量")
-                        continue
-                    bili=float(row[7])*float(row[10])
+                        bili=1
+                    else:
+                        amount=row[7]
+                        amount1=1
+                        true=row[10]
+                        true1=1
+                        if amount!='':
+                            amount1=float(amount)
+                        if true!='':
+                            true1=float(true)
+                        bili=amount1*true1
                     if startTime1==endTime:
                         isToady=True
                         continue
@@ -109,7 +118,10 @@ class StockInfoSyn:
                 if connection.tdxDayPath=='':
                     fectExecute.fetchByStartAndEndTime(realCode,startTime,endTime)
                 else:
-                    fectExecute.parseDataFromCvs(connection.tdxDayPath,realCode,startTime,endTime,bili)
+                    if bili==1:
+                        fectExecute.fetchByStartAndEndTime(realCode, startTime, endTime)
+                    else:
+                        fectExecute.parseDataFromCvs(connection.tdxDayPath,realCode,startTime,endTime,bili)
             if self.isJgdy=='True':
                 jgdy = JgdyQuery()
                 jgdy.printJgdyInfo(realCode.split('.')[1], 1)
